@@ -323,13 +323,26 @@ curl "http://localhost:8788/api/pairing/claim" ^
   - `minor_id` (UUID, requerido)
   - `text_preview` (string, requerido; mínimo 3 chars)
   - `app_source` (string, opcional; default `"Sistema"`)
-  - `risk_level` (number 1|2|3, opcional; si no viene, usa `mock_risk_level` o default `2`)
-  - `mock_risk_level` (number 1|2|3, opcional)
-  - `confidence_score` (number, opcional; default `0.8`)
-  - `sensitive_data_flag` (boolean, opcional)
-  - `shared_alert_levels` (array de int, opcional; default `[1,2,3]`)
+  - `risk_level` (number 1|2|3, opcional): **resultado on-device** (SLM/heurística). Si no viene, usa `mock_risk_level`.
+  - `mock_risk_level` (number 1|2|3, opcional): solo para pruebas.
+  - `confidence_score` (number, opcional): **confianza on-device** (\(0..1\)).
+  - `sensitive_data_flag` (boolean, opcional): si se detectó exposición de datos sensibles (teléfono, dirección, ubicación, etc).
+  - `kipi_response` (string, opcional): mensaje on-device para el menor (si el escudo local ya lo generó).
+  - `force_cloud` (boolean, opcional): fuerza reclasificación en servidor.
+  - `cloud_confidence_threshold` (number, opcional): umbral \(0..1\) para decidir escalamiento a nube (default `0.78`).
+  - `shared_alert_levels` (array de int, opcional; default `[1,2,3]`): fallback; si el menor tiene `minors.shared_alert_levels` en BD, ese valor tiene prioridad.
 - **Respuesta (200)**
-  - `{ ok: true, analysis: {...}, system_action: {...}, alert_id, procesado_en_ms }`
+  - `{ ok: true, analysis: {...}, system_action: {...}, cloud: {...}, alert_id, procesado_en_ms }`
+
+**Regla de “IA potente” (escalamiento a nube)**
+
+El backend replica el patrón: **clasificación local primero**, y solo si hay **incertidumbre** se envía a un modelo más potente (Gemini) en servidor.
+
+- Se usa nube si:
+  - `force_cloud=true`, o
+  - `risk_level >= 2` **y** `confidence_score < cloud_confidence_threshold`, o
+  - faltan campos on-device (fallback a nube).
+- Si la nube falla, el backend **no bloquea** el flujo: devuelve el análisis on-device y añade `cloud.error`.
 
 **Ejemplo**
 
@@ -337,7 +350,7 @@ curl "http://localhost:8788/api/pairing/claim" ^
 curl "http://localhost:8788/api/notifications/analyze" ^
   -H "Authorization: Bearer ACCESS_TOKEN" ^
   -H "Content-Type: application/json" ^
-  -d "{\"minor_id\":\"UUID_DEL_MENOR\",\"text_preview\":\"Me puedes pasar tu dirección?\",\"app_source\":\"WhatsApp\",\"mock_risk_level\":3,\"sensitive_data_flag\":true}"
+  -d "{\"minor_id\":\"UUID_DEL_MENOR\",\"text_preview\":\"Me puedes pasar tu dirección?\",\"app_source\":\"WhatsApp\",\"risk_level\":2,\"confidence_score\":0.55,\"sensitive_data_flag\":true}"
 ```
 
 ---

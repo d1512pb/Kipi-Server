@@ -2,6 +2,7 @@ import { decideEscalationToParent } from "@kipi/domain";
 import { useMemo, useState, type ReactElement } from "react";
 import { useOnlineStatus } from "../hooks/use-online-status.js";
 import { fetchJson } from "../lib/api-client.js";
+import { apiUrl } from "../lib/api.js";
 
 type HealthResponse = { ok: true; service: string; time: string };
 
@@ -54,7 +55,7 @@ export function RootRoute(): ReactElement {
             onClick={async () => {
               setError(null);
               try {
-                const data = await fetchJson<HealthResponse>("/health");
+                const data = await fetchJson<HealthResponse>(apiUrl("/health"));
                 setHealth(data);
               } catch (e) {
                 setHealth(null);
@@ -70,7 +71,7 @@ export function RootRoute(): ReactElement {
               cursor: "pointer",
             }}
           >
-            Probar API (proxy → :8787)
+            Probar API (Railway)
           </button>
         </div>
 

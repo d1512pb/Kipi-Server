@@ -7,6 +7,7 @@ import { getSupabaseAdmin } from "../supabase/client.js";
 import { generatePairingOtp, normalizePairingOtp, isValidPairingOtpFormat } from "../pairing/otp.js";
 import { PARENT_DASHBOARD_ASSISTANT_SYSTEM_PROMPT } from "../assistant/masterPrompt.js";
 import { geminiGenerateText } from "../model-providers/gemini.js";
+import { classifyNotification, decideCloudEscalation } from "../notifications/classifier.js";
 import crypto from "crypto";
 
 type OwnedMinorAuth = { parentId: string; minorId: string };
@@ -956,7 +957,7 @@ apiRouter.post("/notifications/analyze", async (c) => {
   const supabase = getSupabaseAdmin();
   const { data: minor, error: minorError } = await supabase
     .from("minors")
-    .select("id,parent_id,shared_alert_levels")
+    .select("id,parent_id,age_mode,shared_alert_levels")
     .eq("id", minorId)
     .maybeSingle();
   if (minorError) {
@@ -969,21 +970,35 @@ apiRouter.post("/notifications/analyze", async (c) => {
     return writeProblem(c, ApiErrorCode.FORBIDDEN, "No tienes permisos sobre este menor.");
   }
 
-  const riskRaw =
-    typeof record["risk_level"] === "number"
-      ? record["risk_level"]
-      : typeof record["mock_risk_level"] === "number"
-        ? record["mock_risk_level"]
-        : 2;
+  const onDevice: Record<string, unknown> = {};
+  if (typeof record["risk_level"] === "number") onDevice["risk_level"] = record["risk_level"];
+  else if (typeof record["mock_risk_level"] === "number") onDevice["risk_level"] = record["mock_risk_level"];
+  if (typeof record["confidence_score"] === "number") onDevice["confidence_score"] = record["confidence_score"];
+  if (typeof record["sensitive_data_flag"] === "boolean") onDevice["sensitive_data_flag"] = record["sensitive_data_flag"];
+  if (typeof record["kipi_response"] === "string") onDevice["kipi_response"] = record["kipi_response"];
 
-  let risk;
-  try {
-    risk = assertRiskLevel(riskRaw);
-  } catch {
-    return writeProblem(c, ApiErrorCode.TEXT_TOO_SHORT, "risk_level inválido (usa 1, 2 o 3).");
-  }
+  const cloudDecision = decideCloudEscalation({
+    onDevice: onDevice as any,
+    force_cloud: record["force_cloud"],
+    cloud_confidence_threshold: record["cloud_confidence_threshold"],
+  });
 
-  const decision = decideEscalationToParent(risk, shared);
+  const { analysis, cloud_error } = await classifyNotification({
+    age_mode: (minor as any).age_mode,
+    app_source: typeof record["app_source"] === "string" ? record["app_source"] : "Sistema",
+    text_preview: textPreview.trim(),
+    onDevice: (onDevice as any) || null,
+    use_cloud: cloudDecision.use_cloud,
+  });
+
+  const sharedLevelsFromDb = Array.isArray((minor as any).shared_alert_levels)
+    ? ((minor as any).shared_alert_levels as unknown[]).filter(
+        (n): n is number => typeof n === "number" && Number.isInteger(n),
+      )
+    : null;
+  const effectiveSharedLevels = sharedLevelsFromDb && sharedLevelsFromDb.length ? sharedLevelsFromDb : shared;
+
+  const decision = decideEscalationToParent(analysis.risk_level, effectiveSharedLevels);
 
   const started = Date.now();
 
@@ -993,9 +1008,9 @@ apiRouter.post("/notifications/analyze", async (c) => {
       minor_id: minorId,
       app_source: typeof record["app_source"] === "string" ? record["app_source"] : "Sistema",
       description,
-      risk_level: risk,
-      confidence_score: typeof record["confidence_score"] === "number" ? record["confidence_score"] : 0.8,
-      sensitive_data_flag: Boolean(record["sensitive_data_flag"]),
+      risk_level: analysis.risk_level,
+      confidence_score: analysis.confidence_score,
+      sensitive_data_flag: analysis.sensitive_data_flag,
       escalated_to_parent: decision.escalatedToParent,
       is_manual_help: false,
     })
@@ -1008,15 +1023,15 @@ apiRouter.post("/notifications/analyze", async (c) => {
 
   return c.json({
     ok: true as const,
-    analysis: {
-      risk_level: risk,
-      confidence_score: typeof record["confidence_score"] === "number" ? record["confidence_score"] : 0.8,
-      sensitive_data_flag: Boolean(record["sensitive_data_flag"]),
-      kipi_response: "Análisis guardado. (IA real pendiente de integración).",
-    },
+    analysis,
     system_action: {
       escalated_to_parent: decision.escalatedToParent,
       reason: decision.reason,
+    },
+    cloud: {
+      used: analysis.source === "cloud",
+      decision_reason: cloudDecision.reason,
+      error: cloud_error,
     },
     alert_id: inserted.id,
     procesado_en_ms: Date.now() - started,
