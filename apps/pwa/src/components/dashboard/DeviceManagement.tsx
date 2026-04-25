@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import { apiUrl } from "@/lib/api";
 import { friendlyErrorMessage } from "@/lib/friendly-error";
+import { useNavigate } from "react-router-dom";
 
 const DEVICE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   phone: Smartphone,
@@ -51,6 +52,7 @@ export function DeviceManagement({
   accessToken: string | null | undefined;
   enabled: boolean;
 }) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
@@ -116,6 +118,7 @@ export function DeviceManagement({
     toast.info("Agregar dispositivo", {
       description: "Escanea el código QR desde la app del dispositivo.",
     });
+    navigate("/pairing");
   };
 
   return (
