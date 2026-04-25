@@ -3,6 +3,13 @@ import { ApiErrorCode } from "@kipi/domain";
 import { writeProblem } from "../http/problem-json.js";
 import { getSupabaseAdmin } from "../supabase/client.js";
 
+function demoBypassAuthEnabled(): boolean {
+  const raw = process.env["DEMO_BYPASS_AUTH"];
+  if (!raw) return false;
+  const v = String(raw).trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
 function parseBearerToken(authHeader: string | undefined): string | null {
   if (!authHeader) return null;
   const m = authHeader.match(/^\s*Bearer\s+(.+)\s*$/i);
@@ -13,6 +20,15 @@ export async function requireSupabaseUser(c: Context): Promise<
   | { ok: true; user: { id: string; email?: string | null }; token: string }
   | { ok: false; response: Response }
 > {
+  if (demoBypassAuthEnabled()) {
+    // Demo mode: accept requests without validating Supabase JWT.
+    return {
+      ok: true,
+      token: "demo",
+      user: { id: "00000000-0000-0000-0000-000000000000", email: "demo@kipi.local" },
+    };
+  }
+
   const authHeader = c.req.header("Authorization");
   const token = parseBearerToken(authHeader);
   if (!token) {

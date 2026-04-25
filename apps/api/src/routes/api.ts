@@ -14,6 +14,13 @@ type OwnedMinorAuth = { parentId: string; minorId: string };
 
 type DeviceAuth = { deviceId: string; minorId: string };
 
+function demoBypassAuthEnabled(): boolean {
+  const raw = process.env["DEMO_BYPASS_AUTH"];
+  if (!raw) return false;
+  const v = String(raw).trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
+
 function sha256Base64Url(input: string): string {
   return crypto.createHash("sha256").update(input, "utf8").digest("base64url");
 }
@@ -37,6 +44,15 @@ async function requireDevice(c: any): Promise<
   | { ok: true; data: DeviceAuth }
   | { ok: false; response: Response }
 > {
+  if (demoBypassAuthEnabled()) {
+    // Demo mode: allow device ingestion without validating api_key.
+    // Use IDs provided by client when available, else fall back to fixed placeholders.
+    const q = new URL(c.req.url).searchParams;
+    const deviceId = q.get("device_id") || "00000000-0000-0000-0000-000000000000";
+    const minorId = q.get("minor_id") || "00000000-0000-0000-0000-000000000000";
+    return { ok: true, data: { deviceId, minorId } };
+  }
+
   const apiKey = readDeviceAuthHeader(c);
   if (!apiKey || apiKey.length < 16) {
     return {
@@ -82,6 +98,11 @@ async function requireOwnedMinor(c: any, minorId: string): Promise<
       ok: false,
       response: writeProblem(c, ApiErrorCode.INVALID_UUID, "minor_id es obligatorio y debe ser un UUID válido."),
     };
+  }
+
+  if (demoBypassAuthEnabled()) {
+    // Demo mode: skip Supabase auth + ownership checks.
+    return { ok: true, data: { parentId: "demo", minorId } };
   }
 
   const auth = await requireSupabaseUser(c);
@@ -202,7 +223,7 @@ apiRouter.get("/dashboard", async (c) => {
 
   const auth = await requireSupabaseUser(c);
   if (!auth.ok) return auth.response;
-  if (auth.user.id !== parentId) {
+  if (!demoBypassAuthEnabled() && auth.user.id !== parentId) {
     return writeProblem(c, ApiErrorCode.AUTH_REQUIRED, "parent_id no coincide con el usuario autenticado.");
   }
 
@@ -494,7 +515,7 @@ apiRouter.get("/ai/stats", async (c) => {
 
   const auth = await requireSupabaseUser(c);
   if (!auth.ok) return auth.response;
-  if (auth.user.id !== parentId) {
+  if (!demoBypassAuthEnabled() && auth.user.id !== parentId) {
     return writeProblem(c, ApiErrorCode.AUTH_REQUIRED, "parent_id no coincide con el usuario autenticado.");
   }
 
@@ -581,7 +602,7 @@ apiRouter.post("/alerts/manual", async (c) => {
   if (!minor) {
     return writeProblem(c, ApiErrorCode.MINOR_NOT_FOUND, "Menor no encontrado.");
   }
-  if (String(minor.parent_id) !== auth.user.id) {
+  if (!demoBypassAuthEnabled() && String(minor.parent_id) !== auth.user.id) {
     return writeProblem(c, ApiErrorCode.FORBIDDEN, "No tienes permisos sobre este menor.");
   }
 
@@ -651,7 +672,7 @@ apiRouter.patch("/minors/agreement", async (c) => {
   if (!minor) {
     return writeProblem(c, ApiErrorCode.MINOR_NOT_FOUND, "Menor no encontrado.");
   }
-  if (String(minor.parent_id) !== auth.user.id) {
+  if (!demoBypassAuthEnabled() && String(minor.parent_id) !== auth.user.id) {
     return writeProblem(c, ApiErrorCode.FORBIDDEN, "No tienes permisos sobre este menor.");
   }
 
@@ -733,7 +754,7 @@ apiRouter.post("/pairing/confirm-code", async (c) => {
   if (typeof parentId !== "string" || !isUuid(parentId)) {
     return writeProblem(c, ApiErrorCode.INVALID_UUID, "parent_id es obligatorio y debe ser un UUID válido.");
   }
-  if (auth.user.id !== parentId) {
+  if (!demoBypassAuthEnabled() && auth.user.id !== parentId) {
     return writeProblem(c, ApiErrorCode.AUTH_REQUIRED, "parent_id no coincide con el usuario autenticado.");
   }
 
@@ -975,7 +996,7 @@ apiRouter.post("/notifications/analyze", async (c) => {
   if (!minor) {
     return writeProblem(c, ApiErrorCode.MINOR_NOT_FOUND, "Menor no encontrado.");
   }
-  if (String(minor.parent_id) !== auth.user.id) {
+  if (!demoBypassAuthEnabled() && String(minor.parent_id) !== auth.user.id) {
     return writeProblem(c, ApiErrorCode.FORBIDDEN, "No tienes permisos sobre este menor.");
   }
 
@@ -1054,7 +1075,7 @@ apiRouter.get("/gamification/streak", async (c) => {
   }
   const auth = await requireSupabaseUser(c);
   if (!auth.ok) return auth.response;
-  if (auth.user.id !== parentId) {
+  if (!demoBypassAuthEnabled() && auth.user.id !== parentId) {
     return writeProblem(c, ApiErrorCode.AUTH_REQUIRED, "parent_id no coincide con el usuario autenticado.");
   }
 
@@ -1117,7 +1138,7 @@ apiRouter.get("/gamification/missions", async (c) => {
   }
   const auth = await requireSupabaseUser(c);
   if (!auth.ok) return auth.response;
-  if (auth.user.id !== parentId) {
+  if (!demoBypassAuthEnabled() && auth.user.id !== parentId) {
     return writeProblem(c, ApiErrorCode.AUTH_REQUIRED, "parent_id no coincide con el usuario autenticado.");
   }
 
@@ -1158,7 +1179,7 @@ apiRouter.post("/gamification/missions/complete", async (c) => {
   if (typeof parentId !== "string" || !isUuid(parentId)) {
     return writeProblem(c, ApiErrorCode.INVALID_UUID, "parent_id es obligatorio y debe ser un UUID válido.");
   }
-  if (auth.user.id !== parentId) {
+  if (!demoBypassAuthEnabled() && auth.user.id !== parentId) {
     return writeProblem(c, ApiErrorCode.AUTH_REQUIRED, "parent_id no coincide con el usuario autenticado.");
   }
   if (typeof missionId !== "string" || !missionId.trim()) {
@@ -1220,7 +1241,7 @@ apiRouter.post("/assistant/chat", async (c) => {
   if (!parentId || !isUuid(parentId)) {
     return writeProblem(c, ApiErrorCode.INVALID_UUID, "parent_id es obligatorio y debe ser un UUID válido.");
   }
-  if (auth.user.id !== parentId) {
+  if (!demoBypassAuthEnabled() && auth.user.id !== parentId) {
     return writeProblem(c, ApiErrorCode.FORBIDDEN, "No tienes permisos para usar el asistente con ese parent_id.");
   }
 
