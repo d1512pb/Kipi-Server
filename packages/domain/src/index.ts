@@ -8,3 +8,5 @@ export * from "./application/ports.js";
 export * from "./value-objects/age-mode.js";
 export * from "./value-objects/pairing-code.js";
 export * from "./value-objects/risk-level.js";
+export * from "./entities/parent.js";
+export * from "./ports/AuthPort.js";
