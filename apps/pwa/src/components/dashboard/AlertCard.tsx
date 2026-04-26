@@ -204,7 +204,14 @@ export function AlertCard({
                 )}
                 {analyzeDisabled && (
                   <p className="text-[11px] text-muted-foreground mt-2">
-                    Análisis avanzado deshabilitado: selecciona un menor con UUID válido.
+                    Análisis avanzado deshabilitado: selecciona un menor con UUID válido
+                    {minorId != null && String(minorId).trim() ? (
+                      <>
+                        {" "}
+                        (seleccionado: <span className="font-mono">{String(minorId)}</span>)
+                      </>
+                    ) : null}
+                    .
                   </p>
                 )}
               </div>
