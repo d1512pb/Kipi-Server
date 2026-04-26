@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
 import { cn } from "@/lib/utils";
-import { apiBaseLabel, apiUrl, messageFromApiJson } from "@/lib/api";
+import { apiUrl, messageFromApiJson } from "@/lib/api";
 
 type ConfirmCodeResponse =
   | { ok: true; minor_id: string; message?: string }
@@ -273,9 +273,6 @@ export default function PairingPage() {
                     <p className="mt-4 text-xs text-center text-muted-foreground leading-relaxed">
                       El código lo genera la app en el celular del menor (válido 15 minutos). Solo letras y
                       números (sin O, I, 0 ni 1).
-                    </p>
-                    <p className="mt-2 text-[11px] text-center text-muted-foreground/90 font-mono break-all leading-snug">
-                      API PWA: {apiBaseLabel()}
                     </p>
                   </div>
 

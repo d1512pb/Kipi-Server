@@ -5,6 +5,7 @@ export type ApiMinor = {
   name?: string | null;
   age_mode?: "child" | "teen" | string | null;
   alertas_recientes?: unknown[];
+  device_model?: string | null;
 };
 
 export type DashboardChildProfile = {

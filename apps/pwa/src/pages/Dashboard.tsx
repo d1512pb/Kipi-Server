@@ -84,7 +84,10 @@ export default function Dashboard() {
     // que requieren `minor_id` (screen-time, apps, devices) se quedan en estado vacío.
     return remoteMinors
       .filter((m) => m?.minor_id != null && isUuid(String(m.minor_id)))
-      .map(mapMinorToProfile);
+      .map((m) => ({
+        ...mapMinorToProfile(m),
+        device_model: typeof m.device_model === "string" && m.device_model.trim() ? m.device_model.trim() : undefined,
+      }));
   }, [useLiveApi, remoteMinors]);
 
   useEffect(() => {

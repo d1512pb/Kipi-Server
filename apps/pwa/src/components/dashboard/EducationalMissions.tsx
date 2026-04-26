@@ -4,12 +4,20 @@ import { cn } from "@/lib/utils";
 import { apiUrl } from "@/lib/api";
 import { friendlyErrorMessage } from "@/lib/friendly-error";
 
+const LOCAL_COMPLETED_KEY = "kipi_missions_completed_v1";
+
 function InstitutionBadge({ shortName }: { shortName: string }) {
   const palette: Record<string, string> = {
     DIF: "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950/50 dark:text-rose-200 dark:border-rose-800",
     CNDH: "bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-950/50 dark:text-violet-200 dark:border-violet-800",
     "PC / SAPTEL":
       "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950/50 dark:text-sky-200 dark:border-sky-800",
+    "PC / SSC":
+      "bg-sky-100 text-sky-900 border-sky-200 dark:bg-sky-950/50 dark:text-sky-100 dark:border-sky-800",
+    TikTok:
+      "bg-zinc-100 text-zinc-900 border-zinc-200 dark:bg-zinc-950/50 dark:text-zinc-100 dark:border-zinc-800",
+    Meta:
+      "bg-indigo-100 text-indigo-900 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-100 dark:border-indigo-800",
   };
   const cls = palette[shortName] || palette.DIF;
   return (
@@ -25,9 +33,62 @@ type Mission = {
   description: string;
   institution: string;
   institution_short: string;
+  source_url?: string | null;
   reward_visual?: string | null;
   is_completed: boolean;
 };
+
+const STATIC_MISSIONS: Omit<Mission, "is_completed">[] = [
+  {
+    id: "ssc-policia-cibernetica",
+    title: "Misión: Conoce a tus Aliados Digitales",
+    description:
+      "Aprende a identificar y reportar incidentes en línea mediante los canales oficiales de la Secretaría de Seguridad Ciudadana. Conoce cómo la Policía Cibernética te respalda para actuar con eficacia y prevenir riesgos de manera proactiva.",
+    institution: "Policía Cibernética - SSC CDMX",
+    institution_short: "PC / SSC",
+    source_url: "https://www.ssc.cdmx.gob.mx/agrupamientos/policia-cibernetica",
+    reward_visual: null,
+  },
+  {
+    id: "tiktok-family-pairing",
+    title: "Misión: Configuración Familiar en TikTok",
+    description:
+      "Activa la función de Sincronización Familiar para guiar la experiencia digital de tus hijos de forma colaborativa. Fomenta el entretenimiento seguro estableciendo límites de tiempo en pantalla y opciones de privacidad compartidas.",
+    institution: "Centro de Seguridad de TikTok",
+    institution_short: "TikTok",
+    source_url: "https://www.tiktok.com/safety/es/",
+    reward_visual: null,
+  },
+  {
+    id: "meta-family-center",
+    title: "Misión: Privacidad Activa en Redes Sociales",
+    description:
+      "Revisa y fortalece los ajustes de privacidad en las plataformas sociales utilizando las herramientas de supervisión parental oficiales. Dialoga con tus adolescentes sobre la importancia de gestionar su huella digital y tener el control de su información personal.",
+    institution: "Centro para Familias de Meta",
+    institution_short: "Meta",
+    source_url: "https://familycenter.meta.com/es-la/",
+    reward_visual: null,
+  },
+];
+
+function readCompletedFromLocal(): Set<string> {
+  try {
+    const raw = localStorage.getItem(LOCAL_COMPLETED_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((x) => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeCompletedToLocal(done: Set<string>) {
+  try {
+    localStorage.setItem(LOCAL_COMPLETED_KEY, JSON.stringify(Array.from(done)));
+  } catch {
+    // ignore
+  }
+}
 
 export function EducationalMissions({
   parentId,
@@ -44,8 +105,21 @@ export function EducationalMissions({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [celebrateId, setCelebrateId] = useState<string | null>(null);
 
+  const loadStatic = useCallback(() => {
+    const completed = typeof window !== "undefined" ? readCompletedFromLocal() : new Set<string>();
+    setMissions(
+      STATIC_MISSIONS.map((m) => ({
+        ...m,
+        is_completed: completed.has(m.id),
+      })),
+    );
+  }, []);
+
   const load = useCallback(async () => {
-    if (!enabled || !parentId) return;
+    if (!enabled || !parentId) {
+      loadStatic();
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -56,18 +130,28 @@ export function EducationalMissions({
       setMissions(body.missions as Mission[]);
     } catch (e) {
       setError(friendlyErrorMessage(e));
-      setMissions([]);
+      loadStatic();
     } finally {
       setLoading(false);
     }
-  }, [enabled, parentId]);
+  }, [enabled, parentId, loadStatic]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const complete = async (missionId: string) => {
-    if (!enabled || !parentId) return;
+    if (!enabled || !parentId) {
+      setBusyId(missionId);
+      const completed = readCompletedFromLocal();
+      completed.add(missionId);
+      writeCompletedToLocal(completed);
+      setCelebrateId(missionId);
+      window.setTimeout(() => setCelebrateId(null), 1400);
+      loadStatic();
+      setBusyId(null);
+      return;
+    }
     setBusyId(missionId);
     try {
       const res = await fetch(apiUrl("/api/gamification/missions/complete"), {
@@ -88,14 +172,6 @@ export function EducationalMissions({
       setBusyId(null);
     }
   };
-
-  if (!enabled) {
-    return (
-      <section className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
-        Sin datos en vivo para esta vista.
-      </section>
-    );
-  }
 
   return (
     <section className="space-y-3">
@@ -129,7 +205,21 @@ export function EducationalMissions({
               <div>
                 <h3 className="font-semibold text-foreground text-sm leading-snug">{m.title}</h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{m.description}</p>
-                <p className="text-[11px] text-sky-700/90 dark:text-sky-300/90 mt-2">Fuente: {m.institution}</p>
+                <p className="text-[11px] text-sky-700/90 dark:text-sky-300/90 mt-2">
+                  Fuente:{" "}
+                  {m.source_url ? (
+                    <a
+                      href={m.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline underline-offset-2 hover:opacity-90"
+                    >
+                      {m.institution}
+                    </a>
+                  ) : (
+                    m.institution
+                  )}
+                </p>
                 {m.reward_visual && (
                   <p className="text-[11px] text-emerald-700/85 dark:text-emerald-300/85 mt-1">
                     Recompensa: {m.reward_visual}

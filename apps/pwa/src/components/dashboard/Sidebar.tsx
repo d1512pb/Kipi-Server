@@ -4,7 +4,6 @@ import {
   Bell,
   Clock,
   Lock,
-  Smartphone,
   Settings,
   Zap,
   LogOut,
@@ -20,7 +19,6 @@ const NAV_ITEMS: Array<{ id: string; label: string; icon: React.ComponentType<{ 
   { id: "alerts", label: "Alertas", icon: Bell },
   { id: "screentime", label: "Tiempo de Pantalla", icon: Clock },
   { id: "privacy", label: "Privacidad IA", icon: Lock },
-  { id: "devices", label: "Dispositivos", icon: Smartphone },
 ];
 
 const BOTTOM_ITEMS: Array<{ id: string; label: string; icon: React.ComponentType<{ className?: string }> }> = [

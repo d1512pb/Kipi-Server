@@ -265,6 +265,33 @@ apiRouter.get("/dashboard", async (c) => {
 
   const minorsList = minors ?? [];
   const alertsByMinor = new Map<string, any[]>();
+  const deviceLabelByMinor = new Map<string, string>();
+
+  // Cargar un "label" de dispositivo por menor (modelo o nombre).
+  // Esto alimenta el selector del header en la PWA sin obligar a una llamada extra por menor.
+  try {
+    const minorIds = minorsList.map((m: any) => String(m.id)).filter(Boolean);
+    if (minorIds.length) {
+      const { data: devices, error: devicesError } = await supabase
+        .from("devices")
+        .select("minor_id,device_model,device_name,created_at")
+        .in("minor_id", minorIds)
+        .order("created_at", { ascending: true });
+
+      if (devicesError) throw devicesError;
+
+      for (const d of devices ?? []) {
+        const mid = String((d as any).minor_id ?? "");
+        if (!mid || deviceLabelByMinor.has(mid)) continue;
+        const model = typeof (d as any).device_model === "string" ? String((d as any).device_model).trim() : "";
+        const name = typeof (d as any).device_name === "string" ? String((d as any).device_name).trim() : "";
+        const label = model || name;
+        if (label) deviceLabelByMinor.set(mid, label);
+      }
+    }
+  } catch {
+    // ignore: dashboard can render without device labels
+  }
 
   // Obtener alertas por menor y exponer `fecha` + `asistente_parental` mock.
   // (Más compatible con la UI y evita sorpresas con .in() en algunos entornos.)
@@ -316,6 +343,7 @@ apiRouter.get("/dashboard", async (c) => {
       minor_id: m.id,
       name: m.name,
       age_mode: m.age_mode,
+      device_model: deviceLabelByMinor.get(String(m.id)) ?? null,
       shared_alert_levels: m.shared_alert_levels ?? [1, 2, 3],
       stats: { alertas_nivel_2: lvl2, alertas_nivel_3: lvl3 },
       alertas_recientes: rows,
@@ -1108,29 +1136,44 @@ type Mission = {
   description: string;
   estimated_minutes: number;
   category: string;
+  institution: string;
+  institution_short: string;
+  source_url: string;
 };
 
 const MISSIONS_CATALOG: Mission[] = [
   {
-    id: "dif-grooming-guia-2024",
-    title: "Guía rápida: Grooming",
-    description: "Aprende señales, prevención y cómo actuar ante grooming en chats.",
+    id: "ssc-policia-cibernetica",
+    title: "Misión: Conoce a tus Aliados Digitales",
+    description:
+      "Aprende a identificar y reportar incidentes en línea mediante los canales oficiales de la Secretaría de Seguridad Ciudadana. Conoce cómo la Policía Cibernética te respalda para actuar con eficacia y prevenir riesgos de manera proactiva.",
     estimated_minutes: 6,
     category: "seguridad",
+    institution: "Policía Cibernética - SSC CDMX",
+    institution_short: "PC / SSC",
+    source_url: "https://www.ssc.cdmx.gob.mx/agrupamientos/policia-cibernetica",
   },
   {
-    id: "dif-ciberacoso-kit-2024",
-    title: "Kit anti-ciberacoso",
-    description: "Pasos prácticos para detectar y responder a ciberbullying.",
-    estimated_minutes: 8,
-    category: "convivencia",
-  },
-  {
-    id: "dif-privacidad-basicos-2024",
-    title: "Privacidad en apps",
-    description: "Ajustes básicos y hábitos para proteger datos personales.",
+    id: "tiktok-family-pairing",
+    title: "Misión: Configuración Familiar en TikTok",
+    description:
+      "Activa la función de Sincronización Familiar para guiar la experiencia digital de tus hijos de forma colaborativa. Fomenta el entretenimiento seguro estableciendo límites de tiempo en pantalla y opciones de privacidad compartidas.",
     estimated_minutes: 7,
+    category: "bienestar",
+    institution: "Centro de Seguridad de TikTok",
+    institution_short: "TikTok",
+    source_url: "https://www.tiktok.com/safety/es/",
+  },
+  {
+    id: "meta-family-center",
+    title: "Misión: Privacidad Activa en Redes Sociales",
+    description:
+      "Revisa y fortalece los ajustes de privacidad en las plataformas sociales utilizando las herramientas de supervisión parental oficiales. Dialoga con tus adolescentes sobre la importancia de gestionar su huella digital y tener el control de su información personal.",
+    estimated_minutes: 8,
     category: "privacidad",
+    institution: "Centro para Familias de Meta",
+    institution_short: "Meta",
+    source_url: "https://familycenter.meta.com/es-la/",
   },
 ];
 
