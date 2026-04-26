@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AlertItem } from "./types";
+import { getInterventionAdvice } from "@/lib/interventionAdvice";
 
 const LEVEL_CONFIG: Record<
   AlertItem["level"],
@@ -80,6 +81,9 @@ export function AlertCard({
   const Icon = config.Icon;
 
   const platformClass = PLATFORM_BADGE[alert.platform] || PLATFORM_BADGE.Sistema;
+  
+  const isManual = Boolean((alert as any).isManual);
+  const adviceData = getInterventionAdvice(alert.level, isManual);
 
   return (
     <div
@@ -190,15 +194,17 @@ export function AlertCard({
                     Validado
                   </span>
                 </div>
-                <p className="text-sm text-primary/85 leading-relaxed">{alert.intervention}</p>
+                <p className="text-sm text-primary/85 leading-relaxed">{adviceData.advice}</p>
+                {adviceData.resources && (
+                  <ul className="mt-2.5 space-y-1">
+                    {adviceData.resources.map((res, i) => (
+                      <li key={i} className="text-xs font-semibold text-destructive">{res}</li>
+                    ))}
+                  </ul>
+                )}
                 {analyzeDisabled && (
                   <p className="text-[11px] text-muted-foreground mt-2">
                     Análisis avanzado deshabilitado: selecciona un menor con UUID válido.
-                  </p>
-                )}
-                {!!minorId && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Menor activo: <span className="font-medium">{String(minorId)}</span>
                   </p>
                 )}
               </div>
