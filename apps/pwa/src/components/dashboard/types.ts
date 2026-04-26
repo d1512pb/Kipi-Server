@@ -21,5 +21,6 @@ export type ChildProfile = {
   grade?: string;
   school?: string;
   color: string; // "hsl(...)"
+  device_model?: string;
 };
 

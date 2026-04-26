@@ -1,4 +1,4 @@
-import { Menu, ShieldCheck } from "lucide-react";
+import { Menu, ShieldCheck, Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,11 +9,13 @@ export function Header({
   activeChildIndex,
   onChildChange,
   profiles,
+  onAddDevice,
 }: {
   onMenuClick: () => void;
   activeChildIndex: number;
   onChildChange: (index: number) => void;
   profiles: ChildProfile[];
+  onAddDevice?: () => void;
 }) {
   const [logoFailed, setLogoFailed] = useState(false);
 
@@ -73,10 +75,24 @@ export function Header({
               >
                 {child.initial}
               </div>
-              <span>{child.name}</span>
+              <span>
+                {child.device_model 
+                  ? child.device_model 
+                  : (child.name === "Dispositivo vinculado" ? "Dispositivo vinculado" : child.name)}
+              </span>
               <span className="text-xs text-muted-foreground hidden md:inline">{child.age} años</span>
             </button>
           ))}
+          {onAddDevice && (
+            <button
+              onClick={onAddDevice}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-card/50 text-muted-foreground hover:text-foreground hover:bg-card shadow-xs transition-colors duration-150 ml-1"
+              title="Agregar Dispositivo"
+              type="button"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </header>

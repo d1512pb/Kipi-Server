@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Header } from "@/components/dashboard/Header";
 import { Sidebar } from "@/components/dashboard/Sidebar";
@@ -8,7 +9,6 @@ import { AlertsFeed } from "@/components/dashboard/AlertsFeed";
 import { ScreenTimeChart } from "@/components/dashboard/ScreenTimeChart";
 import { RecentApps } from "@/components/dashboard/RecentApps";
 import { AITransparency } from "@/components/dashboard/AITransparency";
-import { DeviceManagement } from "@/components/dashboard/DeviceManagement";
 import { ParentalAgreements } from "@/components/dashboard/ParentalAgreements";
 import { StreakCounter } from "@/components/dashboard/StreakCounter";
 import { EducationalMissions } from "@/components/dashboard/EducationalMissions";
@@ -22,6 +22,7 @@ import type { ApiMinor } from "@kipi/domain";
 import { friendlyErrorMessage } from "@/lib/friendly-error";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { user, accessToken } = useAuth() as any;
   const [activeChildIndex, setActiveChildIndex] = useState(0);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
@@ -145,6 +146,7 @@ export default function Dashboard() {
         activeChildIndex={activeChildIndex}
         onChildChange={setActiveChildIndex}
         profiles={profiles}
+        onAddDevice={() => navigate("/pairing")}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -278,13 +280,6 @@ export default function Dashboard() {
               </section>
             </div>
             <div className="flex flex-col gap-4">
-              <section id="section-devices">
-                <DeviceManagement
-                  minorId={minorIdIsApiReady ? activeMinorId : null}
-                  accessToken={accessToken}
-                  enabled={!!useLiveApi && minorIdIsApiReady}
-                />
-              </section>
               <section id="section-agreement">
                 <ParentalAgreements
                   minorId={minorIdIsApiReady ? activeMinorId : (activeChild?.id as any)}

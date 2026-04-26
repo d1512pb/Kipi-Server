@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { MessageCircle, Send, ShieldCheck, AlertTriangle } from "lucide-react";
 import { apiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -199,7 +200,9 @@ export function ParentalChat({
                         m.isError && "border-destructive/40 bg-destructive/10",
                       )}
                     >
-                      <p className="whitespace-pre-wrap">{m.content}</p>
+                      <div className="markdown-body space-y-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>p]:mb-2 [&_strong]:font-semibold [&>h3]:font-semibold [&>h3]:text-sm">
+                        <ReactMarkdown>{m.content}</ReactMarkdown>
+                      </div>
                       <p
                         className={cn(
                           "mt-2 text-[10px] opacity-80",

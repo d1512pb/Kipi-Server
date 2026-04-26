@@ -322,6 +322,45 @@ apiRouter.get("/dashboard", async (c) => {
     };
   });
 
+  if (parentId === "00000000-0000-4000-8000-000000000001") {
+    result.forEach((minor: any) => {
+      // 1. Alertas aleatorias (0, 1 o 2) y timestamps recientes
+      if (minor.alertas_recientes && minor.alertas_recientes.length > 0) {
+        const numAlerts = Math.floor(Math.random() * 3); // 0, 1 o 2
+        minor.alertas_recientes = minor.alertas_recientes
+          .sort(() => 0.5 - Math.random())
+          .slice(0, numAlerts);
+
+        minor.alertas_recientes.forEach((alerta: any) => {
+          const minutesAgo = Math.floor(Math.random() * 120) + 1; // 1 a 120 minutos
+          const recentDate = new Date(Date.now() - minutesAgo * 60000).toISOString();
+          alerta.created_at = recentDate;
+          if (alerta.fecha !== undefined) alerta.fecha = recentDate;
+        });
+      }
+
+      // 2. Aplicaciones recientes y tiempo en pantalla
+      // Generamos un mock barajeado con tiempos de pantalla variados
+      const baseApps = [
+        { nombre: "TikTok", tiempo_en_pantalla: 45 },
+        { nombre: "Instagram", tiempo_en_pantalla: 30 },
+        { nombre: "WhatsApp", tiempo_en_pantalla: 20 },
+        { nombre: "YouTube", tiempo_en_pantalla: 60 }
+      ];
+      
+      const shuffledApps = baseApps.sort(() => 0.5 - Math.random());
+      minor.aplicaciones_recientes = shuffledApps.map(app => {
+        // Sumar o restar minutos aleatorios (ej. -10 a +15 mins)
+        const variacion = Math.floor(Math.random() * 26) - 10; 
+        const tiempoFinal = Math.max(1, app.tiempo_en_pantalla + variacion);
+        return {
+          ...app,
+          tiempo_en_pantalla: tiempoFinal
+        };
+      });
+    });
+  }
+
   return c.json({ ok: true as const, minors: result });
 });
 
@@ -1015,9 +1054,15 @@ apiRouter.post("/notifications/analyze", async (c) => {
     return writeProblem(c, ApiErrorCode.INTERNAL_ERROR, insertError?.message || "Error al guardar alerta.");
   }
 
+  // Agregamos el campo personalizado que el usuario solicitó
+  const analysisResult = {
+    ...analysis,
+    mensaje_para_el_menor: analysis.risk_level >= 2 ? analysis.kipi_response : null
+  };
+
   return c.json({
     ok: true as const,
-    analysis,
+    analysis: analysisResult,
     system_action: {
       escalated_to_parent: decision.escalatedToParent,
       reason: decision.reason,

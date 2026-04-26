@@ -17,45 +17,83 @@ async function fetchDashboardMinorsCount(userId) {
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user] = useState({
-    id: DEMO_PARENT_ID,
-    email: "demo@kipi.local",
-    name: "Demo",
-  });
+  const [user, setUser] = useState(null);
   const [accessToken] = useState(null);
   const [isNewUser, setIsNewUser] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
+    const sessionData = localStorage.getItem('kipi_session');
+    let initialUser = null;
+    
+    if (sessionData) {
+      try {
+        initialUser = JSON.parse(sessionData);
+        setUser(initialUser);
+      } catch (e) {
+        console.error("Error al parsear kipi_session", e);
+      }
+    }
+
     let cancelled = false;
     (async () => {
-      const { ok, count } = await fetchDashboardMinorsCount(DEMO_PARENT_ID);
-      if (cancelled) return;
-      if (ok) setIsNewUser(count === 0);
+      if (initialUser?.id) {
+        const { ok, count } = await fetchDashboardMinorsCount(initialUser.id);
+        if (cancelled) return;
+        if (ok) setIsNewUser(count === 0);
+      }
       setAuthLoading(false);
     })();
+    
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const login = useCallback(async () => {
-    const { ok, count } = await fetchDashboardMinorsCount(DEMO_PARENT_ID);
+  const login = useCallback(async (email, password) => {
+    // Simulamos un inicio de sesión exitoso y la creación del objeto usuario
+    const loggedUser = {
+      id: email === "ana@familia.com" || email === "demo@kipi.local"
+        ? DEMO_PARENT_ID
+        : (crypto.randomUUID ? crypto.randomUUID() : "12345678-1234-1234-1234-123456789012"),
+      email: email,
+      name: email.split("@")[0]
+    };
+
+    setUser(loggedUser);
+    localStorage.setItem('kipi_session', JSON.stringify(loggedUser));
+
+    const { ok, count } = await fetchDashboardMinorsCount(loggedUser.id);
     if (ok) setIsNewUser(count === 0);
+
     return { success: true, isNewUser: ok ? count === 0 : false };
   }, []);
 
-  const register = useCallback(async () => {
+  const register = useCallback(async (email, password, name) => {
+    const newUser = {
+      id: crypto.randomUUID ? crypto.randomUUID() : "12345678-1234-1234-1234-123456789012",
+      email: email,
+      name: name || email.split("@")[0]
+    };
+
+    setUser(newUser);
+    localStorage.setItem('kipi_session', JSON.stringify(newUser));
+    setIsNewUser(true);
+
     return { success: true, isNewUser: true };
   }, []);
 
   const completePairing = useCallback(async () => {
-    const { ok, count } = await fetchDashboardMinorsCount(DEMO_PARENT_ID);
+    if (!user?.id) return;
+    const { ok, count } = await fetchDashboardMinorsCount(user.id);
     if (ok) setIsNewUser(count === 0);
     else setIsNewUser(false);
-  }, []);
+  }, [user?.id]);
 
-  const logout = useCallback(async () => {}, []);
+  const logout = useCallback(async () => {
+    setUser(null);
+    localStorage.removeItem('kipi_session');
+  }, []);
 
   const refreshBackendState = useCallback(async () => {
     await completePairing();
